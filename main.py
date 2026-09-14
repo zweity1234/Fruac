@@ -2,56 +2,173 @@ import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
 
-st.set_page_config(page_title="Meyve Sayar", page_icon="🍎", layout="centered")
+# Sayfa Yapılandırması
+st.set_page_config(
+    page_title="Fruac | Fruit Accounting",
+    page_icon="🍏",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-st.title("🍎 Tarım Meyve Sayım & Verim Analizi")
+# --- ÖZEL CSS TASARIM DOKUNUŞLARI ---
+st.markdown("""
+    <style>
+        /* Ana arka plan ve yazı tipleri */
+        .main {
+            background-color: #0e1117;
+        }
+        
+        /* Başlık stili */
+        .app-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 24px;
+            border-radius: 18px;
+            color: white;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .app-header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+        .app-header p {
+            color: #d1d8e0;
+            font-size: 1rem;
+            margin: 0;
+        }
 
-# Modeli 'nano' (n) yerine 'medium' (m) versiyona yükselttik (Daha zeki ve detaylı tarama)
+        /* Metrik kutucukları (Özet Kartları) */
+        div[data-testid="stMetric"] {
+            background: #1f242d;
+            border: 1px solid #2e3642;
+            padding: 16px;
+            border-radius: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        div[data-testid="stMetricLabel"] {
+            color: #9aa0a6 !important;
+            font-size: 0.9rem !important;
+        }
+        div[data-testid="stMetricValue"] {
+            color: #00d26a !important;
+            font-size: 1.8rem !important;
+            font-weight: 700 !important;
+        }
+
+        /* Fotoğraf yükleme kutusu */
+        div[data-testid="stFileUploader"] {
+            border: 2px dashed #2a5298;
+            border-radius: 14px;
+            padding: 10px;
+            background: #161a23;
+        }
+
+        /* Butonlar ve kontroller */
+        .stButton>button {
+            border-radius: 10px;
+            background: linear-gradient(90deg, #00b09b, #96c93d);
+            color: white;
+            font-weight: bold;
+            border: none;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Model yükleme
 @st.cache_resource
 def load_model():
-    return YOLO("yolov8m.pt") # 'n' harfi 'm' oldu
+    return YOLO("yolov8m.pt")
 
 model = load_model()
 
-# AYARLAR KISMI (Telefonda gizlenmemesi için ana ekrana, üst tarafa aldık)
-st.markdown("### ⚙️ Analiz Ayarları")
-col1, col2 = st.columns(2)
+# Ürünler ve ortalama gramajlar
+URUNLER = {
+    "Elma (Apple)": {"sinif": "apple", "gram": 150},
+    "Portakal (Orange)": {"sinif": "orange", "gram": 200},
+    "Muz (Banana)": {"sinif": "banana", "gram": 120},
+    "Havuç (Carrot)": {"sinif": "carrot", "gram": 80},
+    "Brokoli (Broccoli)": {"sinif": "broccoli", "gram": 300},
+}
+
+# Özel Başlık Kartı
+st.markdown("""
+    <div class="app-header">
+        <h1>🍏 Fruac</h1>
+        <p>Yapay Zeka Destekli Akıllı Ağaç Sayım ve Verim Analizi</p>
+    </div>
+""", unsafe_allow_html=True)
+
+# --- KONTROL PANELİ ---
+st.markdown("##### ⚙️ Analiz Seçenekleri")
+col1, col2, col3 = st.columns(3)
+
 with col1:
-    meyve_tipi = st.selectbox("Meyve Türü", ["Elma (Apple)", "Portakal (Orange)"])
+    secilen_urun = st.selectbox("Ürün Çeşidi", list(URUNLER.keys()))
+    hedef_sinif = URUNLER[secilen_urun]["sinif"]
+
 with col2:
-    guven_esigi = st.slider("Yapay Zeka Hassasiyeti", 0.05, 1.0, 0.15, 0.05)
-    
-hedef_sinif = "apple" if "Elma" in meyve_tipi else "orange"
-varsayilan_gram = 150 if hedef_sinif == "apple" else 200
+    varsayilan_gram = URUNLER[secilen_urun]["gram"]
+    ortalama_gram = st.number_input(
+        "Tane Gramajı (gr)",
+        min_value=10,
+        max_value=2000,
+        value=varsayilan_gram,
+        step=10
+    )
 
-ortalama_gram = st.number_input("Adet Başı Ortalama Gramaj (gr)", min_value=10, max_value=1000, value=varsayilan_gram, step=10)
+with col3:
+    guven_esigi = st.slider("Hassasiyet (Confidence)", 0.05, 1.0, 0.15, 0.05)
 
-st.markdown("---")
+st.write("")
 
-# Fotoğraf Yükleme Alanı
-yuklenen_dosya = st.file_uploader("Ağaç veya dal fotoğrafı yükleyin...", type=["jpg", "jpeg", "png"])
+# --- ÇOKLU FOTOĞRAF YÜKLEME ---
+st.markdown("##### 📸 Ağaç Görselleri")
+yuklenen_dosyalar = st.file_uploader(
+    "Aynı ağacın farklı açılardan çekilmiş fotoğraflarını seçin...",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True
+)
 
-if yuklenen_dosya is not None:
-    image = Image.open(yuklenen_dosya)
-    
-    with st.spinner("Yapay zeka derin analizi yapıyor, lütfen bekleyin..."):
-        results = model.predict(image, conf=guven_esigi, imgsz=1280)
-        
-        # Hedef meyveyi say
-        adet = 0
-        for box in results[0].boxes:
-            sinif_adi = model.names[int(box.cls[0])]
-            if sinif_adi == hedef_sinif:
-                adet += 1
-        
-        # Ağırlık hesabı
-        toplam_kg = (adet * ortalama_gram) / 1000
-        cizili_resim = results[0].plot()
+if yuklenen_dosyalar:
+    toplam_adet = 0
+    analiz_sonuclari = []
 
-    # Sonuç Panelleri
-    c1, c2 = st.columns(2)
-    c1.metric("Tespit Edilen Adet", f"{adet} adet")
-    c2.metric("Tahmini Verim", f"{toplam_kg:.2f} kg")
+    with st.spinner("Görüntüler işleniyor..."):
+        for dosya in yuklenen_dosyalar:
+            image = Image.open(dosya)
+            results = model.predict(image, conf=guven_esigi, imgsz=1280)
+            
+            foto_adet = 0
+            for box in results[0].boxes:
+                sinif_adi = model.names[int(box.cls[0])]
+                if sinif_adi == hedef_sinif:
+                    foto_adet += 1
+            
+            toplam_adet += foto_adet
+            cizili_resim = results[0].plot()
+            analiz_sonuclari.append({
+                "dosya_adi": dosya.name,
+                "adet": foto_adet,
+                "resim": cizili_resim
+            })
 
-    # Çizilmiş Görsel
-    st.image(cizili_resim, channels="BGR", use_container_width=True)
+    toplam_kg = (toplam_adet * ortalama_gram) / 1000
+
+    st.markdown("---")
+    st.markdown("##### 📊 Toplam Ağaç Verimi")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Kare Sayısı", f"{len(yuklenen_dosyalar)} Açı")
+    m2.metric("Sayılan Meyve", f"{toplam_adet} Adet")
+    m3.metric("Tahmini Hasat", f"{toplam_kg:.2f} kg")
+
+    st.markdown("---")
+    st.markdown("##### 🔍 Açı Detayları")
+
+    sutunlar = st.columns(min(len(analiz_sonuclari), 2))
+    for i, sonuc in enumerate(analiz_sonuclari):
+        with sutunlar[i % 2]:
+            st.markdown(f"**Açı {i+1}:** `{sonuc['dosya_adi']}`")
+            st.caption(f"Tespit: **{sonuc['adet']} adet** | Tahmini: **{(sonuc['adet'] * ortalama_gram)/1000:.2f} kg**")
+            st.image(sonuc["resim"], channels="BGR", use_container_width=True)
