@@ -104,7 +104,7 @@ if yuklenen_dosyalar:
 
 # --- GEÇMİŞ HAFIZAYI (GALERİYİ) GÖSTERME ---
 st.markdown("---")
-st.markdown("##### 🕰️ Uygulama Hafızası (Önceki Analizler)")
+st.markdown("##### 📂 Geçmiş Analizler")
 kayitli_dosyalar = os.listdir(HAFIZA_KLASOR)
 
 if len(kayitli_dosyalar) > 0:
