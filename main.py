@@ -22,61 +22,81 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="app-header"><h1>🍏 Fruac</h1><p>Yapay Zeka Destekli Meyve Sayım ve Verim Analizi</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="app-header"><h1>🍏 Fruac</h1><p>Özel Eğitilmiş Yapay Zeka ile Meyve Sayımı</p></div>', unsafe_allow_html=True)
 
-# --- HAFIZA KLASÖRÜ OLUŞTURMA ---
+# Hafıza Klasörü
 HAFIZA_KLASOR = "uygulama_hafizasi"
 if not os.path.exists(HAFIZA_KLASOR):
     os.makedirs(HAFIZA_KLASOR)
 
+# --- SENİN EĞİTTİĞİN ÖZEL MODEL YÜKLENİYOR ---
 @st.cache_resource
 def load_model():
-    return YOLO("yolov8m.pt")
+    return YOLO("best.pt")
 
 model = load_model()
 
+# Modelin bildiği özel sınıflar
 URUNLER = {
     "Elma (Apple)": {"sinif": "apple", "gram": 150},
-    "Portakal (Orange)": {"sinif": "orange", "gram": 200},
-    "Muz (Banana)": {"sinif": "banana", "gram": 120},
-    "Havuç (Carrot)": {"sinif": "carrot", "gram": 80},
-    "Brokoli (Broccoli)": {"sinif": "broccoli", "gram": 300},
+    "Portakal (Orange)": {"sinif": "orange", "gram": 200}
 }
 
+# --- AYARLAR ---
 st.markdown("##### ⚙️ Analiz Seçenekleri")
 col1, col2, col3 = st.columns(3)
+
 with col1:
     secilen_etiket = st.selectbox("Meyve Türü", list(URUNLER.keys()))
     hedef_sinif = URUNLER[secilen_etiket]["sinif"]
     hedef_id = [idx for idx, name in model.names.items() if name == hedef_sinif][0]
+
 with col2:
-    ortalama_gram = st.number_input("Tane Gramaj (gr)", min_value=10, max_value=2000, value=URUNLER[secilen_etiket]["gram"], step=10)
+    ortalama_gram = st.number_input(
+        "Tane Gramaj (gr)",
+        min_value=10,
+        max_value=2000,
+        value=URUNLER[secilen_etiket]["gram"],
+        step=10
+    )
+
 with col3:
-    guven_esigi = st.slider("Hassasiyet (Confidence)", 0.05, 1.0, 0.15, 0.05)
+    guven_esigi = st.slider("Hassasiyet (Confidence)", 0.05, 1.0, 0.25, 0.05)
 
 st.write("")
 
+# --- FOTOĞRAF YÜKLEME ---
 st.markdown("##### 📸 Fotoğraf Yükle")
-yuklenen_dosyalar = st.file_uploader("Ağaç fotoğraflarını seçin veya kamerayla çekin...", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+yuklenen_dosyalar = st.file_uploader(
+    "Ağaç fotoğraflarını seçin veya kamerayla çekin...",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True
+)
 
 if yuklenen_dosyalar:
     toplam_adet = 0
     analiz_sonuclari = []
 
-    with st.spinner("Meyveler analiz ediliyor..."):
+    with st.spinner("Özel model ağaçtaki meyveleri analiz ediyor..."):
         for dosya in yuklenen_dosyalar:
             image = Image.open(dosya)
             
-            results = model.predict(image, conf=guven_esigi, classes=[hedef_id], imgsz=1280)
+            # Kendi modelimizle tahmin
+            results = model.predict(
+                image,
+                conf=guven_esigi,
+                classes=[hedef_id],
+                imgsz=640
+            )
+            
             adet = len(results[0].boxes)
             toplam_adet += adet
             cizili_resim = results[0].plot(labels=False)
             
-            # --- FOTOĞRAFI HAFIZAYA KAYDETME (RGB'ye Çevirerek) ---
+            # Arşive kaydet
             resim_rgb = cv2.cvtColor(cizili_resim, cv2.COLOR_BGR2RGB)
             kayit_resmi = Image.fromarray(resim_rgb)
             kayit_resmi.save(os.path.join(HAFIZA_KLASOR, dosya.name))
-            # -----------------------------------------------------
 
             analiz_sonuclari.append({
                 "dosya_adi": dosya.name,
@@ -86,6 +106,7 @@ if yuklenen_dosyalar:
 
     toplam_kg = (toplam_adet * ortalama_gram) / 1000
 
+    # Metrikler
     st.markdown("---")
     st.markdown("##### 📊 Verim Raporu")
     m1, m2, m3 = st.columns(3)
@@ -93,6 +114,7 @@ if yuklenen_dosyalar:
     m2.metric("Toplam Sayılan Meyve", f"{toplam_adet} Adet")
     m3.metric("Tahmini Toplam Hasat", f"{toplam_kg:.2f} kg")
 
+    # Tespit Edilen Fotoğraflar
     st.markdown("---")
     st.markdown("##### 🔍 Tespit Edilen Alanlar")
     sutunlar = st.columns(min(len(analiz_sonuclari), 2))
@@ -102,13 +124,12 @@ if yuklenen_dosyalar:
             st.caption(f"Sayılan: **{sonuc['adet']} adet**")
             st.image(sonuc["resim"], channels="BGR", use_container_width=True)
 
-# --- GEÇMİŞ HAFIZAYI (GALERİYİ) GÖSTERME ---
+# --- ARŞİV BÖLÜMÜ ---
 st.markdown("---")
-st.markdown("##### 📂 Geçmiş Analizler")
+st.markdown("##### 🌳 Hasat Arşivi")
 kayitli_dosyalar = os.listdir(HAFIZA_KLASOR)
 
 if len(kayitli_dosyalar) > 0:
-    # Fotoğrafları yan yana 4'lü sütunlar halinde göster
     hafiza_sutunlar = st.columns(4)
     for i, dosya_adi in enumerate(kayitli_dosyalar):
         with hafiza_sutunlar[i % 4]:
@@ -116,11 +137,9 @@ if len(kayitli_dosyalar) > 0:
             st.image(acilan_resim, use_container_width=True)
             st.caption(f"📁 {dosya_adi}")
     
-    # Hafızayı temizleme butonu
-    if st.button("🗑️ Hafızayı Temizle"):
+    if st.button("🗑️ Arşivi Temizle"):
         for dosya_adi in kayitli_dosyalar:
             os.remove(os.path.join(HAFIZA_KLASOR, dosya_adi))
-        st.rerun() # Sayfayı yenile
+        st.rerun()
 else:
-    st.info("Hafızada henüz kaydedilmiş bir fotoğraf yok.")
-    
+    st.info("Arşivde henüz kayıtlı fotoğraf yok.")
