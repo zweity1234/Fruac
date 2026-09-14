@@ -2,7 +2,7 @@ import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
 import os
-import cv2
+import json
 
 # Sayfa Yapılandırması
 st.set_page_config(
@@ -24,19 +24,30 @@ st.markdown("""
 
 st.markdown('<div class="app-header"><h1>🍏 Fruac</h1><p>Özel Eğitilmiş Yapay Zeka ile Meyve Sayımı</p></div>', unsafe_allow_html=True)
 
-# Hafıza Klasörü
+# Hafıza Klasörü ve Veri Yönetimi
 HAFIZA_KLASOR = "uygulama_hafizasi"
 if not os.path.exists(HAFIZA_KLASOR):
     os.makedirs(HAFIZA_KLASOR)
 
-# --- SENİN EĞİTTİĞİN ÖZEL MODEL YÜKLENİYOR ---
+VERI_DOSYASI = os.path.join(HAFIZA_KLASOR, "veriler.json")
+
+def arsiv_verilerini_oku():
+    if os.path.exists(VERI_DOSYASI):
+        with open(VERI_DOSYASI, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def arsiv_verisi_kaydet(veriler):
+    with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
+        json.dump(veriler, f, ensure_ascii=False, indent=4)
+
+# --- MODEL YÜKLEME ---
 @st.cache_resource
 def load_model():
     return YOLO("best.pt")
 
 model = load_model()
 
-# Modelin bildiği özel sınıflar
 URUNLER = {
     "Elma (Apple)": {"sinif": "apple", "gram": 150},
     "Portakal (Orange)": {"sinif": "orange", "gram": 200}
@@ -76,12 +87,13 @@ yuklenen_dosyalar = st.file_uploader(
 if yuklenen_dosyalar:
     toplam_adet = 0
     analiz_sonuclari = []
+    mevcut_arsiv = arsiv_verilerini_oku()
 
     with st.spinner("Özel model ağaçtaki meyveleri analiz ediyor..."):
         for dosya in yuklenen_dosyalar:
             image = Image.open(dosya)
             
-            # Kendi modelimizle tahmin
+            # Model ile tahmin
             results = model.predict(
                 image,
                 conf=guven_esigi,
@@ -92,11 +104,17 @@ if yuklenen_dosyalar:
             adet = len(results[0].boxes)
             toplam_adet += adet
             cizili_resim = results[0].plot(labels=False)
-            
-            # Arşive kaydet
-            resim_rgb = cv2.cvtColor(cizili_resim, cv2.COLOR_BGR2RGB)
-            kayit_resmi = Image.fromarray(resim_rgb)
-            kayit_resmi.save(os.path.join(HAFIZA_KLASOR, dosya.name))
+            hesaplanan_kg = round((adet * ortalama_gram) / 1000, 2)
+
+            # 1. TEMİZ RESMİ KAYDET (Kutucuksuz, orijinal fotoğraf)
+            image.save(os.path.join(HAFIZA_KLASOR, dosya.name))
+
+            # 2. VERİLERİ NOT ET
+            mevcut_arsiv[dosya.name] = {
+                "meyve": secilen_etiket,
+                "adet": adet,
+                "kg": hesaplanan_kg
+            }
 
             analiz_sonuclari.append({
                 "dosya_adi": dosya.name,
@@ -104,42 +122,67 @@ if yuklenen_dosyalar:
                 "resim": cizili_resim
             })
 
+    # Verileri diske yaz
+    arsiv_verisi_kaydet(mevcut_arsiv)
     toplam_kg = (toplam_adet * ortalama_gram) / 1000
 
-    # Metrikler
+    # Canlı Rapor
     st.markdown("---")
-    st.markdown("##### 📊 Verim Raporu")
+    st.markdown("##### 📊 Anlık Analiz Raporu")
     m1, m2, m3 = st.columns(3)
     m1.metric("Analiz Edilen Fotoğraf", f"{len(yuklenen_dosyalar)} Adet")
     m2.metric("Toplam Sayılan Meyve", f"{toplam_adet} Adet")
     m3.metric("Tahmini Toplam Hasat", f"{toplam_kg:.2f} kg")
 
-    # Tespit Edilen Fotoğraflar
+    # Kutulu Tespit Detayları
     st.markdown("---")
     st.markdown("##### 🔍 Tespit Edilen Alanlar")
     sutunlar = st.columns(min(len(analiz_sonuclari), 2))
     for i, sonuc in enumerate(analiz_sonuclari):
         with sutunlar[i % 2]:
-            st.markdown(f"**Görsel {i+1}:** `{sonuc['dosya_adi']}`")
+            st.markdown(f"**Görsel:** `{sonuc['dosya_adi']}`")
             st.caption(f"Sayılan: **{sonuc['adet']} adet**")
             st.image(sonuc["resim"], channels="BGR", use_container_width=True)
 
-# --- ARŞİV BÖLÜMÜ ---
+# --- YENİLENMİŞ HASAT ARŞİVİ ---
 st.markdown("---")
 st.markdown("##### 🌳 Hasat Arşivi")
-kayitli_dosyalar = os.listdir(HAFIZA_KLASOR)
 
-if len(kayitli_dosyalar) > 0:
-    hafiza_sutunlar = st.columns(4)
-    for i, dosya_adi in enumerate(kayitli_dosyalar):
-        with hafiza_sutunlar[i % 4]:
-            acilan_resim = Image.open(os.path.join(HAFIZA_KLASOR, dosya_adi))
-            st.image(acilan_resim, use_container_width=True)
-            st.caption(f"📁 {dosya_adi}")
+arsiv_verileri = arsiv_verilerini_oku()
+# Sadece resim dosyalarını listele
+kayitli_dosyalar = [f for f in os.listdir(HAFIZA_KLASOR) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+
+if kayitli_dosyalar:
+    # 2 sütunlu düzenli kart yapısı
+    kart_sutunlari = st.columns(2)
     
+    for i, dosya_adi in enumerate(kayitli_dosyalar):
+        bilgi = arsiv_verileri.get(dosya_adi, {
+            "meyve": "Belirtilmedi",
+            "adet": "-",
+            "kg": "-"
+        })
+        resim_yolu = os.path.join(HAFIZA_KLASOR, dosya_adi)
+        
+        with kart_sutunlari[i % 2]:
+            with st.container(border=True):
+                # Solda küçük resim (1 birim), sağda veriler (2 birim)
+                sol_resim, sag_veri = st.columns([1, 2])
+                
+                with sol_resim:
+                    temiz_resim = Image.open(resim_yolu)
+                    st.image(temiz_resim, use_container_width=True)
+                
+                with sag_veri:
+                    st.markdown(f"**{bilgi['meyve']}**")
+                    st.caption(f"📁 `{dosya_adi}`")
+                    st.markdown(f"🔢 **{bilgi['adet']}** Adet")
+                    st.markdown(f"⚖️ **{bilgi['kg']}** kg")
+
+    st.write("")
     if st.button("🗑️ Arşivi Temizle"):
-        for dosya_adi in kayitli_dosyalar:
-            os.remove(os.path.join(HAFIZA_KLASOR, dosya_adi))
+        for dosya in os.listdir(HAFIZA_KLASOR):
+            os.remove(os.path.join(HAFIZA_KLASOR, dosya))
         st.rerun()
 else:
-    st.info("Arşivde henüz kayıtlı fotoğraf yok.")
+    st.info("Arşivde henüz kayıtlı bir analiz bulunmuyor.")
