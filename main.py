@@ -1,6 +1,6 @@
 import streamlit as st
 from ultralytics import YOLO
-from PIL import Image
+from PIL import Image, ImageOps
 import os
 import json
 
@@ -49,7 +49,7 @@ def load_model():
 
 model = load_model()
 
-# Seçenekler (Toleranslı Liste)
+# Seçenekler 
 URUNLER = {
     "Tüm Meyveler (Elma & Portakal)": {"siniflar": ["apple", "orange"], "gram": 160},
     "Sadece Elma (Apple)": {"siniflar": ["apple"], "gram": 150},
@@ -93,7 +93,9 @@ if yuklenen_dosyalar:
 
     with st.spinner("Meyveler tespit ediliyor ve veriler hesaplanıyor..."):
         for dosya in yuklenen_dosyalar:
+            # İŞTE DÜZELTME BURADA: Fotoğrafın gizli dönme açısını sıfırlıyoruz!
             image = Image.open(dosya).convert("RGB")
+            image = ImageOps.exif_transpose(image)
             
             # Model ile tahmin yap
             results = model.predict(image, conf=guven_esigi, imgsz=640)
@@ -109,17 +111,16 @@ if yuklenen_dosyalar:
             toplam_adet += adet
             hesaplanan_kg = round((adet * ortalama_gram) / 1000, 2)
 
-            # 1. ORİJİNAL TEMİZ FOTOĞRAFI KAYDET (Kutucuksuz)
+            # Temiz fotoğrafı kaydet
             image.save(os.path.join(HAFIZA_KLASOR, dosya.name))
 
-            # 2. VERİLERİ SÖZLÜĞE YAZ
+            # Verileri yaz
             mevcut_arsiv[dosya.name] = {
                 "tur": secilen_etiket.split(" (")[0],
                 "adet": adet,
                 "kg": hesaplanan_kg
             }
 
-            # Canlı önizleme için kutuları çiz
             cizili_resim = results[0].plot(labels=False)
             analiz_sonuclari.append({
                 "dosya_adi": dosya.name,
@@ -127,7 +128,6 @@ if yuklenen_dosyalar:
                 "resim": cizili_resim
             })
 
-    # Dosyaya yaz
     arsiv_verisi_kaydet(mevcut_arsiv)
     toplam_kg = (toplam_adet * ortalama_gram) / 1000
 
@@ -185,4 +185,3 @@ if kayitli_dosyalar:
         st.rerun()
 else:
     st.info("Arşivde henüz kayıtlı bir analiz bulunmuyor.")
-    
