@@ -147,7 +147,7 @@ if yuklenen_dosyalar:
                     foto_adet += 1
             
             toplam_adet += foto_adet
-            cizili_resim = results[0].plot()
+            cizili_resim = results[0].plot(labels=False)
             analiz_sonuclari.append({
                 "dosya_adi": dosya.name,
                 "adet": foto_adet,
