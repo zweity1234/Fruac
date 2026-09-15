@@ -45,7 +45,7 @@ def arsiv_verisi_kaydet(veriler):
 # Model Yükleme
 @st.cache_resource
 def load_model():
-    return YOLO("best.pt")
+    return YOLO("best (2).pt")
 
 model = load_model()
 
@@ -98,7 +98,7 @@ if yuklenen_dosyalar:
             image = ImageOps.exif_transpose(image)
             
             # Model ile tahmin yap
-            results = model.predict(image, conf=guven_esigi, imgsz=640)
+            results = model.predict(image, conf=0.45, imgsz=640, iou=0.5)
             
             # Kutuları filtrele
             eslesen_kutular = []
