@@ -53,7 +53,7 @@ model = load_model()
 URUNLER = {
     "Tüm Meyveler (Elma & Portakal)": {"siniflar": ["apple", "orange"], "gram": 160},
     "Sadece Elma (Apple)": {"siniflar": ["apple"], "gram": 150},
-    "Sadece Portakal (Orange)": {"siniflar": ["orange"], "gram": 200}
+    "Sadece Portakal (Orange)": {"siniflar": ["apple", "orange"], "gram": 200}
 }
 
 # --- AYARLAR ---
