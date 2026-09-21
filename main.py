@@ -162,7 +162,7 @@ if yuklenen_dosyalar:
     # Canlı Analiz Görselleri (Kutucuklu)
     st.markdown("---")
     st.markdown("##### 🔍 Tespit Edilen Alanlar")
-    sutunlar = st.columns(min(len(analiz_sonuclari), 2))
+    sutunlar = st.columns(max(1, min(len(analiz_sonuclari), 2)))
     for i, sonuc in enumerate(analiz_sonuclari):
         with sutunlar[i % 2]:
             st.markdown(f"**Görsel:** `{sonuc['dosya_adi']}`")
