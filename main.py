@@ -96,7 +96,8 @@ if yuklenen_dosyalar:
                 tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                 tfile.write(dosya.read())
                 
-                sonuclar = model.track(source=tfile.name, conf=0.15, imgsz=1024, iou=0.6, persist=True, stream=True, tracker="bytetrack.yaml")
+                # VİDEO İŞLEME KISMI - guven_esigi ve bytetrack eklendi!
+                sonuclar = model.track(source=tfile.name, conf=guven_esigi, imgsz=1024, iou=0.6, persist=True, stream=True, tracker="bytetrack.yaml")
                 
                 for kare_sonucu in sonuclar:
                     if kare_sonucu.boxes is not None and kare_sonucu.boxes.id is not None:
@@ -117,7 +118,8 @@ if yuklenen_dosyalar:
                 image = Image.open(dosya).convert("RGB")
                 image = ImageOps.exif_transpose(image)
                 
-                results = model.predict(image, conf=0.15, imgsz=1024, iou=0.6)
+                # FOTOĞRAF İŞLEME KISMI - guven_esigi eklendi!
+                results = model.predict(image, conf=guven_esigi, imgsz=1024, iou=0.6)
                 
                 eslesen_kutular = []
                 for box in results[0].boxes:
