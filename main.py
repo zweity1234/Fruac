@@ -3,6 +3,7 @@ from ultralytics import YOLO
 from PIL import Image, ImageOps
 import os
 import json
+import tempfile
 
 # Sayfa Yapılandırması
 st.set_page_config(
@@ -80,11 +81,7 @@ st.write("")
 
 # --- FOTOĞRAF YÜKLEME ---
 st.markdown("##### 📸 Fotoğraf Yükle")
-yuklenen_dosyalar = st.file_uploader(
-    "Ağaç fotoğraflarını seçin...",
-    type=["jpg", "jpeg", "png"],
-    accept_multiple_files=True
-)
+yuklenen_dosyalar = st.file_uploader("Fotoğraf veya Video Yükle", type=["jpg", "jpeg", "png", "mp4", "mov"], accept_multiple_files=True)
 
 if yuklenen_dosyalar:
     toplam_adet = 0
@@ -93,33 +90,55 @@ if yuklenen_dosyalar:
 
     with st.spinner("Meyveler tespit ediliyor ve veriler hesaplanıyor..."):
         for dosya in yuklenen_dosyalar:
-            # İŞTE DÜZELTME BURADA: Fotoğrafın gizli dönme açısını sıfırlıyoruz!
-            image = Image.open(dosya).convert("RGB")
-            image = ImageOps.exif_transpose(image)
-            
-            # Model ile tahmin yap
-            results = model.predict(image, conf=0.15, imgsz=1024, iou=0.6)
-            
-            # Kutuları filtrele
-            eslesen_kutular = []
-            for box in results[0].boxes:
-                sinif_adi = model.names[int(box.cls)]
-                if sinif_adi in kabul_edilen_siniflar:
-                    eslesen_kutular.append(box)
-
-            adet = len(eslesen_kutular)
-            toplam_adet += adet
-            hesaplanan_kg = round((adet * ortalama_gram) / 1000, 2)
-
-            # Temiz fotoğrafı kaydet
-            image.save(os.path.join(HAFIZA_KLASOR, dosya.name))
-
-            # Verileri yaz
-            mevcut_arsiv[dosya.name] = {
-                "tur": secilen_etiket.split(" (")[0],
-                "adet": adet,
-                "kg": hesaplanan_kg
-            }
+            if dosya.name.split('.')[-1].lower() in ['mp4', 'mov']:
+                st.info(f"🎥 {dosya.name} videosu işleniyor, ağacın etrafı taranıyor... Lütfen bekleyin.")
+                
+                tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+                tfile.write(dosya.read())
+                
+                sonuclar = model.track(source=tfile.name, conf=0.15, imgsz=1024, iou=0.6, persist=True, stream=True)
+                benzersiz_idler = set()
+                
+                for kare_sonucu in sonuclar:
+                    if kare_sonucu.boxes is not None and kare_sonucu.boxes.id is not None:
+                        for box, obj_id in zip(kare_sonucu.boxes, kare_sonucu.boxes.id):
+                            sinif_adi = model.names[int(box.cls)]
+                            if sinif_adi in kabul_edilen_siniflar:
+                                benzersiz_idler.add(int(obj_id))
+                
+                toplam_meyve = len(benzersiz_idler)
+                hesaplanan_kg = round((toplam_meyve * ortalama_gram) / 1000, 2)
+                
+                st.success("✅ Ağaç 3D Tarama (Video) Analizi Tamamlandı!")
+                st.metric(label="Ağaçtaki Toplam Benzersiz Meyve", value=f"{toplam_meyve} adet")
+                st.metric(label="Tahmini Ağaç Verimi", value=f"{hesaplanan_kg} kg")
+          
+            else:
+               
+                image = Image.open(dosya).convert("RGB")
+                image = ImageOps.exif_transpose(image)
+                
+                results = model.predict(image, conf=0.15, imgsz=1024, iou=0.6)
+                
+                eslesen_kutular = []
+                for box in results[0].boxes:
+                    sinif_adi = model.names[int(box.cls)]
+                    if sinif_adi in kabul_edilen_siniflar:
+                        eslesen_kutular.append(box)
+                
+                adet = len(eslesen_kutular)
+                toplam_adet += adet
+                hesaplanan_kg = round((adet * ortalama_gram) / 1000, 2)
+                
+                # Temiz fotoğrafı kaydet
+                image.save(os.path.join(HAFIZA_KLASOR, dosya.name))
+                
+                # Verileri yaz
+                mevcut_arsiv[dosya.name] = {
+                    "tur": secilen_etiket.split(" ")[0],
+                    "adet": adet,
+                    "kg": hesaplanan_kg
+                }
 
             cizili_resim = results[0].plot(labels=False)
             analiz_sonuclari.append({
