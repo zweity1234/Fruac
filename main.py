@@ -141,12 +141,12 @@ if yuklenen_dosyalar:
                     "kg": hesaplanan_kg
                 }
 
-            cizili_resim = results[0].plot(labels=False)
-            analiz_sonuclari.append({
-                "dosya_adi": dosya.name,
-                "adet": adet,
-                "resim": cizili_resim
-            })
+                cizili_resim = results[0].plot(labels=False)
+                analiz_sonuclari.append({
+                    "dosya_adi": dosya.name,
+                    "adet": adet,
+                    "resim": cizili_resim
+                })
 
     arsiv_verisi_kaydet(mevcut_arsiv)
     toplam_kg = (toplam_adet * ortalama_gram) / 1000
