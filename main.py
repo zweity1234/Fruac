@@ -95,7 +95,7 @@ if yuklenen_dosyalar:
                 
                 tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                 tfile.write(dosya.read())
-                
+                tfile.close()
                 # VİDEO İŞLEME KISMI - guven_esigi ve bytetrack eklendi!
                 sonuclar = model.track(source=tfile.name, conf=guven_esigi, imgsz=640, vid_stride=3, iou=0.6, persist=True, stream=True, tracker="bytetrack.yaml")
                 
