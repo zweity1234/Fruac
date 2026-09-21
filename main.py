@@ -96,8 +96,9 @@ if yuklenen_dosyalar:
                 tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                 tfile.write(dosya.read())
                 tfile.close()
-                # VİDEO İŞLEME KISMI - guven_esigi ve bytetrack eklendi!
-                sonuclar = model.track(source=tfile.name, conf=guven_esigi, imgsz=640, vid_stride=3, iou=0.6, persist=True, stream=True, tracker="bytetrack.yaml")
+                # VİDEO İŞLEME KISMI
+                sonuclar = model.track(source=tfile.name, conf=guven_esigi, imgsz=1024, iou=0.6, persist=True, stream=True)
+                
                 benzersiz_idler = set()
                 for kare_sonucu in sonuclar:
                     if kare_sonucu.boxes is not None and kare_sonucu.boxes.id is not None:
@@ -107,6 +108,7 @@ if yuklenen_dosyalar:
                                 benzersiz_idler.add(int(obj_id))
                 
                 toplam_meyve = len(benzersiz_idler)
+                toplam_adet += toplam_meyve 
                 hesaplanan_kg = round((toplam_meyve * ortalama_gram) / 1000, 2)
                 
                 st.success("✅ Ağaç 3D Tarama (Video) Analizi Tamamlandı!")
