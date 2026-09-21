@@ -3,7 +3,6 @@ from ultralytics import YOLO
 from PIL import Image, ImageOps
 import os
 import json
-import tempfile
 
 # Sayfa Yapılandırması
 st.set_page_config(
@@ -62,7 +61,7 @@ st.markdown("##### ⚙️ Analiz Seçenekleri")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    secilen_etiket = st.selectbox("Sayım Modu", list(URUNLER.keys()))
+    secilen_etiket = st.selectbox("Meyve Türü", list(URUNLER.keys()))
     kabul_edilen_siniflar = URUNLER[secilen_etiket]["siniflar"]
 
 with col2:
@@ -79,98 +78,140 @@ with col3:
 
 st.write("")
 
-# --- FOTOĞRAF YÜKLEME ---
-st.markdown("##### 📸 Fotoğraf Yükle")
-yuklenen_dosyalar = st.file_uploader("Fotoğraf veya Video Yükle", type=["jpg", "jpeg", "png", "mp4", "mov"], accept_multiple_files=True)
+# --- ANALİZ MODU SEÇİMİ ---
+analiz_modu = st.radio(
+    "📌 Analiz Modunu Seçin:",
+    ["📸 Tek Fotoğraf Analizi (Hızlı)", "🌳 4 Cephe Ağaç Analizi (360° Kapsamlı)"],
+    horizontal=True
+)
 
-if yuklenen_dosyalar:
-    toplam_adet = 0
-    analiz_sonuclari = []
-    mevcut_arsiv = arsiv_verilerini_oku()
+st.write("")
 
-    with st.spinner("Meyveler tespit ediliyor ve veriler hesaplanıyor..."):
-        for dosya in yuklenen_dosyalar:
-            if dosya.name.split('.')[-1].lower() in ['mp4', 'mov']:
-                st.info(f"🎥 {dosya.name} videosu işleniyor, ağacın etrafı taranıyor... Lütfen bekleyin.")
-                
-                tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-                tfile.write(dosya.read())
-                tfile.close()
-                # VİDEO İŞLEME KISMI
-                sonuclar = model.track(source=tfile.name, conf=guven_esigi, imgsz=1024, iou=0.6, persist=True, stream=True)
-                
-                benzersiz_idler = set()
-                for kare_sonucu in sonuclar:
-                    if kare_sonucu.boxes is not None and kare_sonucu.boxes.id is not None:
-                        for box, obj_id in zip(kare_sonucu.boxes, kare_sonucu.boxes.id):
-                            sinif_adi = model.names[int(box.cls)]
-                            if sinif_adi in kabul_edilen_siniflar:
-                                benzersiz_idler.add(int(obj_id))
-                
-                toplam_meyve = len(benzersiz_idler)
-                toplam_adet += toplam_meyve 
-                hesaplanan_kg = round((toplam_meyve * ortalama_gram) / 1000, 2)
-                
-                st.success("✅ Ağaç 3D Tarama (Video) Analizi Tamamlandı!")
-                st.metric(label="Ağaçtaki Toplam Benzersiz Meyve", value=f"{toplam_meyve} adet")
-                st.metric(label="Tahmini Ağaç Verimi", value=f"{hesaplanan_kg} kg")
-          
-            else:
-               
-                image = Image.open(dosya).convert("RGB")
-                image = ImageOps.exif_transpose(image)
-                
-                # FOTOĞRAF İŞLEME KISMI - guven_esigi eklendi!
-                results = model.predict(image, conf=guven_esigi, imgsz=1024, iou=0.6)
-                
-                eslesen_kutular = []
-                for box in results[0].boxes:
-                    sinif_adi = model.names[int(box.cls)]
-                    if sinif_adi in kabul_edilen_siniflar:
-                        eslesen_kutular.append(box)
-                
-                adet = len(eslesen_kutular)
+# --- FOTOĞRAF İŞLEME FONKSİYONU ---
+def fotografi_isle(dosya):
+    image = Image.open(dosya).convert("RGB")
+    image = ImageOps.exif_transpose(image)
+    results = model.predict(image, conf=guven_esigi, imgsz=1024, iou=0.6)
+    
+    eslesen_kutular = []
+    for box in results[0].boxes:
+        sinif_adi = model.names[int(box.cls)]
+        if sinif_adi in kabul_edilen_siniflar:
+            eslesen_kutular.append(box)
+    
+    adet = len(eslesen_kutular)
+    cizili_resim = results[0].plot(labels=False)
+    return image, cizili_resim, adet
+
+# ==========================================
+# 1. MOD: TEK FOTOĞRAF ANALİZİ
+# ==========================================
+if analiz_modu == "📸 Tek Fotoğraf Analizi (Hızlı)":
+    st.markdown("##### 📸 Fotoğraf Yükle")
+    yuklenen_dosyalar = st.file_uploader("Fotoğrafları Seçin", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+
+    if yuklenen_dosyalar:
+        toplam_adet = 0
+        analiz_sonuclari = []
+        mevcut_arsiv = arsiv_verilerini_oku()
+
+        with st.spinner("Fotoğraflar analiz ediliyor..."):
+            for dosya in yuklenen_dosyalar:
+                temiz_resim, cizili_resim, adet = fotografi_isle(dosya)
                 toplam_adet += adet
                 hesaplanan_kg = round((adet * ortalama_gram) / 1000, 2)
-                
-                # Temiz fotoğrafı kaydet
-                image.save(os.path.join(HAFIZA_KLASOR, dosya.name))
-                
-                # Verileri yaz
+
+                temiz_resim.save(os.path.join(HAFIZA_KLASOR, dosya.name))
                 mevcut_arsiv[dosya.name] = {
                     "tur": secilen_etiket.split(" ")[0],
                     "adet": adet,
                     "kg": hesaplanan_kg
                 }
 
-                cizili_resim = results[0].plot(labels=False)
                 analiz_sonuclari.append({
                     "dosya_adi": dosya.name,
                     "adet": adet,
                     "resim": cizili_resim
                 })
 
-    arsiv_verisi_kaydet(mevcut_arsiv)
-    toplam_kg = (toplam_adet * ortalama_gram) / 1000
+        arsiv_verisi_kaydet(mevcut_arsiv)
+        toplam_kg = round((toplam_adet * ortalama_gram) / 1000, 2)
 
-    # Rapor Kartları
-    st.markdown("---")
-    st.markdown("##### 📊 Anlık Analiz Raporu")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Analiz Edilen Fotoğraf", f"{len(yuklenen_dosyalar)} Adet")
-    m2.metric("Toplam Sayılan Meyve", f"{toplam_adet} Adet")
-    m3.metric("Tahmini Toplam Hasat", f"{toplam_kg:.2f} kg")
+        st.markdown("---")
+        st.markdown("##### 📊 Anlık Analiz Raporu")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Fotoğraf Sayısı", f"{len(yuklenen_dosyalar)} Adet")
+        m2.metric("Sayılan Toplam Meyve", f"{toplam_adet} Adet")
+        m3.metric("Tahmini Hasat", f"{toplam_kg} kg")
 
-    # Canlı Analiz Görselleri (Kutucuklu)
-    st.markdown("---")
-    st.markdown("##### 🔍 Tespit Edilen Alanlar")
-    sutunlar = st.columns(max(1, min(len(analiz_sonuclari), 2)))
-    for i, sonuc in enumerate(analiz_sonuclari):
-        with sutunlar[i % 2]:
-            st.markdown(f"**Görsel:** `{sonuc['dosya_adi']}`")
-            st.caption(f"Sayılan: **{sonuc['adet']} adet**")
-            st.image(sonuc["resim"], channels="BGR", use_container_width=True)
+        st.markdown("---")
+        st.markdown("##### 🔍 Tespit Edilen Alanlar")
+        sutun_sayisi = max(1, min(len(analiz_sonuclari), 2))
+        sutunlar = st.columns(sutun_sayisi)
+        for i, sonuc in enumerate(analiz_sonuclari):
+            with sutunlar[i % sutun_sayisi]:
+                st.markdown(f"**Görsel:** `{sonuc['dosya_adi']}`")
+                st.caption(f"Sayılan: **{sonuc['adet']} adet**")
+                st.image(sonuc["resim"], channels="BGR", use_container_width=True)
+        st.write("")
+        st.info("💡 **Bilgilendirme:** Bu sonuçlar yapay zeka destekli bir tahmin modeline dayanmaktadır. Işık yansımaları, yaprak örtüsü ve meyvelerin birbirini gizlemesi (occlusion) gibi doğal koşullar nedeniyle sayımlarda küçük hata payları olabilir.")
+# ==========================================
+# 2. MOD: 4 CEPHE AĞAÇ ANALİZİ
+# ==========================================
+else:
+    st.markdown("##### 🌳 Ağacın 4 Cephesinden Fotoğrafları Yükleyin")
+    st.info("💡 Ağacın etrafında 90° aralıklarla (Ön, Sağ, Arka, Sol) çekilmiş 4 fotoğraf yükleyin.")
+    
+    col_a, col_b = st.columns(2)
+    with col_a:
+        f_on = st.file_uploader("1. Cephe (Ön)", type=["jpg", "jpeg", "png"], key="on")
+        f_sag = st.file_uploader("2. Cephe (Sağ)", type=["jpg", "jpeg", "png"], key="sag")
+    with col_b:
+        f_arka = st.file_uploader("3. Cephe (Arka)", type=["jpg", "jpeg", "png"], key="arka")
+        f_sol = st.file_uploader("4. Cephe (Sol)", type=["jpg", "jpeg", "png"], key="sol")
 
+    cepheler = [("Ön", f_on), ("Sağ", f_sag), ("Arka", f_arka), ("Sol", f_sol)]
+    yuklenen_cepheler = [c for c in cepheler if c[1] is not None]
+
+    if len(yuklenen_cepheler) > 0:
+        if st.button("🚀 4 Cephe Ağaç Analizini Başlat", type="primary"):
+            toplam_sayilan = 0
+            cephe_sonuclari = []
+
+            with st.spinner("Tüm cepheler taranıyor ve 360° ağaç verimi hesaplanıyor..."):
+                for isim, dosya in yuklenen_cepheler:
+                    temiz_resim, cizili_resim, adet = fotografi_isle(dosya)
+                    toplam_sayilan += adet
+                    cephe_sonuclari.append({
+                        "cephe": isim,
+                        "adet": adet,
+                        "resim": cizili_resim
+                    })
+
+            ortalama_cephe = round(toplam_sayilan / len(yuklenen_cepheler), 1)
+            # 4 cephe yüklendiyse doğrudan toplamını alıyoruz; eksik yüklendiyse 4 cepheye oranlıyoruz
+            tahmini_agac_toplam = round(ortalama_cephe * 4) if len(yuklenen_cepheler) < 4 else toplam_sayilan
+            tahmini_agac_kg = round((tahmini_agac_toplam * ortalama_gram) / 1000, 2)
+
+            st.success("✅ 360° Ağaç Hasat Analizi Tamamlandı!")
+            st.markdown("---")
+            st.markdown("##### 🌳 Ağaç Verim Raporu")
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("İncelenen Cephe", f"{len(yuklenen_cepheler)} / 4")
+            r2.metric("Görünen Toplam Meyve", f"{toplam_sayilan} Adet")
+            r3.metric("Cephe Başına Ortalama", f"{ortalama_cephe} Adet")
+            r4.metric("Tahmini Ağaç Verimi", f"{tahmini_agac_kg} kg")
+
+            st.markdown("---")
+            st.markdown("##### 🔍 Cephe İnceleme Detayları")
+            c_sutunlar = st.columns(len(cephe_sonuclari))
+            for i, c_veri in enumerate(cephe_sonuclari):
+                with c_sutunlar[i]:
+                    st.markdown(f"**Cephe:** `{c_veri['cephe']}`")
+                    st.caption(f"Tespit Edilen: **{c_veri['adet']} Adet**")
+                    st.image(c_veri["resim"], channels="BGR", use_container_width=True)
+            st.write("")
+            st.info("💡 **Bilgilendirme:** Bu sonuçlar yapay zeka destekli bir tahmin modeline dayanmaktadır. Işık yansımaları, yaprak örtüsü ve meyvelerin birbirini gizlemesi (occlusion) gibi doğal koşullar nedeniyle sayımlarda küçük hata payları olabilir.")
 # --- ARŞİV BÖLÜMÜ ---
 st.markdown("---")
 st.markdown("##### 🌳 Hasat Arşivi")
