@@ -97,7 +97,7 @@ if yuklenen_dosyalar:
                 tfile.write(dosya.read())
                 
                 # VİDEO İŞLEME KISMI - guven_esigi ve bytetrack eklendi!
-                sonuclar = model.track(source=tfile.name, conf=guven_esigi, imgsz=1024, iou=0.6, persist=True, stream=True, tracker="bytetrack.yaml")
+                sonuclar = model.track(source=tfile.name, conf=guven_esigi, imgsz=640, vid_stride=3, iou=0.6, persist=True, stream=True, tracker="bytetrack.yaml")
                 
                 for kare_sonucu in sonuclar:
                     if kare_sonucu.boxes is not None and kare_sonucu.boxes.id is not None:
