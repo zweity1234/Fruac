@@ -98,7 +98,7 @@ if yuklenen_dosyalar:
             image = ImageOps.exif_transpose(image)
             
             # Model ile tahmin yap
-            results = model.predict(image, conf=0.45, imgsz=640, iou=0.5)
+            results = model.predict(image, conf=0.15, imgsz=1024, iou=0.6)
             
             # Kutuları filtrele
             eslesen_kutular = []
