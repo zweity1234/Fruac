@@ -98,7 +98,7 @@ if yuklenen_dosyalar:
                 tfile.close()
                 # VİDEO İŞLEME KISMI - guven_esigi ve bytetrack eklendi!
                 sonuclar = model.track(source=tfile.name, conf=guven_esigi, imgsz=640, vid_stride=3, iou=0.6, persist=True, stream=True, tracker="bytetrack.yaml")
-                
+                benzersiz_idler = set()
                 for kare_sonucu in sonuclar:
                     if kare_sonucu.boxes is not None and kare_sonucu.boxes.id is not None:
                         for box, obj_id in zip(kare_sonucu.boxes, kare_sonucu.boxes.id):
