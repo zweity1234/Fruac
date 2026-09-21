@@ -96,8 +96,7 @@ if yuklenen_dosyalar:
                 tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                 tfile.write(dosya.read())
                 
-                sonuclar = model.track(source=tfile.name, conf=0.15, imgsz=1024, iou=0.6, persist=True, stream=True)
-                benzersiz_idler = set()
+                sonuclar = model.track(source=tfile.name, conf=0.15, imgsz=1024, iou=0.6, persist=True, stream=True, tracker="bytetrack.yaml")
                 
                 for kare_sonucu in sonuclar:
                     if kare_sonucu.boxes is not None and kare_sonucu.boxes.id is not None:
