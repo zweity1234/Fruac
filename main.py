@@ -211,22 +211,27 @@ else:
         sample_tree_count = st.slider("İncelenecek Örnek Ağaç Sayısı", min_value=2, max_value=5, value=3)
 
     st.markdown("---")
-    st.markdown("##### Örnek Ağaçların Fotoğraflarını Yükleyin")
+    st.markdown("##### Örnek Ağaçların 4 Cephe Fotoğraflarını Yükleyin")
 
-    tab_names = [f" {i+1}. Örnek Ağaç" for i in range(sample_tree_count)]
+    tab_names = [f"🌳 {i+1}. Örnek Ağaç" for i in range(sample_tree_count)]
     tabs = st.tabs(tab_names)
 
     tree_files = {}
     for i, tab in enumerate(tabs):
         with tab:
-            st.caption(f"{i+1}. Ağacın 4 Cephe Fotoğraflarını Yükleyin:")
-            uploaded_files_tab = st.file_uploader(
-            f"{i+1}. Ağaç Dosyaları", 
-            type=["jpg", "jpeg", "png"], 
-            accept_multiple_files=True, 
-            key=f"field_tree_{i}"
-        )
-            tree_files[i] = uploaded_files_tab
+            st.caption(f"{i+1}. Örnek Ağacın etrafından çekilen 4 cephe fotoğrafını yükleyin:")
+            
+            col_t_a, col_t_b = st.columns(2)
+            with col_t_a:
+                t_front = st.file_uploader("1. Cephe (Ön)", type=["jpg", "jpeg", "png"], key=f"field_front_{i}")
+                t_right = st.file_uploader("2. Cephe (Sağ)", type=["jpg", "jpeg", "png"], key=f"field_right_{i}")
+            with col_t_b:
+                t_back = st.file_uploader("3. Cephe (Arka)", type=["jpg", "jpeg", "png"], key=f"field_back_{i}")
+                t_left = st.file_uploader("4. Cephe (Sol)", type=["jpg", "jpeg", "png"], key=f"field_left_{i}")
+
+            # Yüklenen fotoğrafları bir liste haline getiriyoruz
+            facades_t = [t_front, t_right, t_back, t_left]
+            tree_files[i] = [f for f in facades_t if f is not None]
 
     st.write("")
     if st.button("Tüm Tarlanın Hasatını Hesapla", type="primary"):
@@ -245,6 +250,7 @@ else:
                             _, _, count = process_image(file)
                             tree_total_count += count
                         
+                        # Eksik cephe varsa 4'e tamamlama oranı
                         if len(files) < 4:
                             tree_total_count = round((tree_total_count / len(files)) * 4)
                         
