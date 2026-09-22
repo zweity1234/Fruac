@@ -1,6 +1,6 @@
 import streamlit as st
-from ultralystics import YOLO
-from PIL import Image, Image0ps
+from ultralytics import YOLO
+from PIL import Image, ImageOps
 import os
 import json
 
@@ -13,7 +13,7 @@ os.makedirs(MEMORY_FOLDER, exist_ok=True)
 DATA_FILE = os.path.join(MEMORY_FOLDER, "database.json")
 
 def load_archive_data():
-    if os.path.exist(DATA_FILE):
+    if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -41,7 +41,7 @@ PRODUCTS = {
 
 # side panel & user controls
 st.markdown("#### Analiz Seçenekleri")
-col1, col2, col3 = st.colums(3)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     selected_label = st.selectbox("Meyve Türü", list(PRODUCTS.keys()))
@@ -77,7 +77,7 @@ st.write("")
 # core image processing engine
 def process_image(file):
      image = Image.open(file).convert("RGB")
-     image = Image0ps.exif_transpose(image)
+     image = ImageOps.exif_transpose(image)
      results = model.predict(image, conf=confidence_threshold, imgsz=1024, iou=0.6)
 
      matched_boxes = []
