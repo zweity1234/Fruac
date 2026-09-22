@@ -93,11 +93,11 @@ def process_image(file):
 
 # mode: single photo analysis
 
-if analysis_mode == "Tek Fotoğraf Analizi":
-     st.markdown("#### Fotoğraf Yükle")
-     uploaded_files = st.file_uploader("Fotoğrafları Seçin", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+if analysis_mode == "Tek Fotoğraf Analizi (Hızlı)":
+    st.markdown("##### Fotoğraf Yükle")
+    uploaded_files = st.file_uploader("Fotoğrafları Seçin", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-     if uploaded_files:
+    if uploaded_files:
           total_count = 0
           analysis_results = []
           existing_archive = load_archive_data()
