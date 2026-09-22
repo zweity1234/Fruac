@@ -152,8 +152,8 @@ elif analysis_mode == "Tek Ağaç 4 Cephe Analizi (360°)":
 
     col_a, col_b = st.columns(2)
     with col_a:
-          f_front = st.file.uploader("1. Cephe (Ön)", type=["jpg", "jpeg", "png"], key="single_front")
-          f_right = st.file_uploader("2. Cephe (Sağ)", type=["jpg", "jpeg", "png"], key="single_right")
+        f_front = st.file_uploader("1. Cephe (Ön)", type=["jpg", "jpeg", "png"], key="single_front")
+        f_right = st.file_uploader("2. Cephe (Sağ)", type=["jpg", "jpeg", "png"], key="single_right")
     with col_b:
         f_back = st.file_uploader("3. Cephe (Arka)", type=["jpg", "jpeg", "png"], key="single_back")
         f_left = st.file_uploader("4. Cephe (Sol)", type=["jpg", "jpeg", "png"], key="single_left")
@@ -163,41 +163,40 @@ elif analysis_mode == "Tek Ağaç 4 Cephe Analizi (360°)":
 
     if len(uploaded_facades) > 0:
         if st.button("4 Cephe Ağaç Analizini Başlat", type="primary"):
-              total_detected = 0
-              facade_results = []
+            total_detected = 0
+            facade_results = []
 
-        with st.spinner("Tüm cepheler taranıyor ve 360° ağaç verimi hesaplanıyor..."):
-            for name, file in uploaded_facades:
-                clean_image, plotted_image, count = process_image(file)
-                total_detected += count
-                facade_results.append({
-                    "facade": name,
-                    "count": count,
-                    "image": plotted_image
-                })
+            with st.spinner("Tüm cepheler taranıyor ve 360° ağaç verimi hesaplanıyor..."):
+                for name, file in uploaded_facades:
+                    clean_image, plotted_image, count = process_image(file)
+                    total_detected += count
+                    facade_results.append({
+                        "facade": name,
+                        "count": count,
+                        "image": plotted_image
+                    })
 
-        average_facade = round(total_detected / len(uploaded_facades), 1)
-        estimated_tree_total = round(average_facade * 4) if len(uploaded_facades) < 4 else total_detected
-        estimated_tree_kg = round((estimated_tree_total * average_gram) / 1000, 2)
+            average_facade = round(total_detected / len(uploaded_facades), 1)
+            estimated_tree_total = round(average_facade * 4) if len(uploaded_facades) < 4 else total_detected
+            estimated_tree_kg = round((estimated_tree_total * average_gram) / 1000, 2)
 
-        st.success(" 360° Ağaç Hasat Analizi Tamamlandı!")
-        st.markdown("---")
-        st.markdown("##### Ağaç Verim Raparu")
-        r1, r2, r3, r4 = st.columns(4)
-        r1.metric("İncelenen Cephe", f"{len(uploaded_facades)} / 4")
-        r2.metric("Görünen Toplam Meyve", f"{total_detected} Adet")
-        r3.metric("Cephe Başına Ortalama", f"{average_facade} Adet")
-        r4.metric("Tahmini Ağaç Verimi", f"{estimated_tree_kg} kg")
+            st.success("360° Ağaç Hasat Analizi Tamamlandı!")
+            st.markdown("---")
+            st.markdown("##### Ağaç Verim Raporu")
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("İncelenen Cephe", f"{len(uploaded_facades)} / 4")
+            r2.metric("Görünen Toplam Meyve", f"{total_detected} Adet")
+            r3.metric("Cephe Başına Ortalama", f"{average_facade} Adet")
+            r4.metric("Tahmini Ağaç Verimi", f"{estimated_tree_kg} kg")
 
-        st.markdown("---")
-        st.markdown("##### Cephe İnceleme Detayları")
-        c_columns = st.columns(len(facade_results))
-        for i, c_data in enumerate(facade_results):
-            with c_columns[i]:
-                st.markdown(f"**Cephe:** `{c_data['facade']}`")
-                st.caption(f"Tespit Edilen: **{c_data['count']} Adet**")
-                st.image(c_data["image"], channels="BGR", use_container_width=True)
-
+            st.markdown("---")
+            st.markdown("##### Cephe İnceleme Detayları")
+            c_columns = st.columns(len(facade_results))
+            for i, c_data in enumerate(facade_results):
+                with c_columns[i]:
+                    st.markdown(f"**Cephe:** `{c_data['facade']}`")
+                    st.caption(f"Tespit Edilen: **{c_data['count']} Adet**")
+                    st.image(c_data["image"], channels="BGR", use_container_width=True)
 
 # mode: field yield estimation (agritech)
 
