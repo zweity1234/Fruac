@@ -4,10 +4,10 @@ from PIL import Image, ImageOps
 import os
 import json
 
-# page confifuraiton
+# --- Page Configuration ---
 st.set_page_config(page_title="Fruac", page_icon="🍏", layout="wide")
 
-# memory & storage management 
+# --- Memory & Storage Management ---
 MEMORY_FOLDER = "app_memory"
 os.makedirs(MEMORY_FOLDER, exist_ok=True)
 DATA_FILE = os.path.join(MEMORY_FOLDER, "database.json")
@@ -18,28 +18,28 @@ def load_archive_data():
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
-                return {}
-        return {}
+            return {}
+    return {}
 
 def save_archive_data(data):
-     with open(DATA_FILE, "w", encoding="utf-8") as f:
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# load YOLO AI model
+# --- Load YOLO AI Model ---
 @st.cache_resource
 def load_ai_model():
-     return YOLO("best (2).pt")
+    return YOLO("best (2).pt")
 
 model = load_ai_model()
 
-# product dictionary
+# --- Product Dictionary ---
 PRODUCTS = {
-     "Tüm Meyveler (Elma & Portakal)": {"classes": ["apple", "orange"], "gram": 160},
-     "Sadece Elma (Apple)": {"classes": ["apple"], "gram": 150},
-     "Sadece Portakal (Orange)": {"classes": ["apple", "orange"], "gram":200}
+    "Tüm Meyveler (Elma & Portakal)": {"classes": ["apple", "orange"], "gram": 160},
+    "Sadece Elma (Apple)": {"classes": ["apple"], "gram": 150},
+    "Sadece Portakal (Orange)": {"classes": ["apple", "orange"], "gram": 200}
 }
 
-# side panel & user controls
+# --- Side Panel & User Controls ---
 st.markdown("#### Analiz Seçenekleri")
 col1, col2, col3 = st.columns(3)
 
@@ -48,104 +48,107 @@ with col1:
     accepted_classes = PRODUCTS[selected_label]["classes"]
 
 with col2:
-     average_gram = st.number_input(
-          "Tane Gramaj (gr)",
-          min_value=10,
-          max_value=2000,
-          value=PRODUCTS[selected_label]["gram"],
-          step=10
-     )
+    average_gram = st.number_input(
+        "Tane Gramaj (gr)",
+        min_value=10,
+        max_value=2000,
+        value=PRODUCTS[selected_label]["gram"],
+        step=10
+    )
 
 with col3:
-     confidence_threshold = st.slider("Hassasiyet (Confidence)", 0.01, 1.0, 0.15, 0.02)
+    confidence_threshold = st.slider("Hassasiyet (Confidence)", 0.01, 1.0, 0.15, 0.02)
 
 st.write("")
 
-# analysis mode selection
+# --- Analysis Mode Selection ---
 analysis_mode = st.radio(
     "Analiz Modunu Seçin:",
     [
-         "Tek Fotoğraf Analizi (Hızlı)",
-         "Tek Ağaç 4 Cephe Analizi (360°)",
-         "Tarla / Bahçe Hasat Tahmini (Örnekleme Modeli)"
+        "Tek Fotoğraf Analizi (Hızlı)",
+        "Tek Ağaç 4 Cephe Analizi (360°)",
+        "Tarla / Bahçe Hasat Tahmini (Örnekleme Modeli)"
     ],
     horizontal=True
 )
 
 st.write("")
 
-# core image processing engine
+# --- Core Image Processing Engine ---
 def process_image(file):
-     image = Image.open(file).convert("RGB")
-     image = ImageOps.exif_transpose(image)
-     results = model.predict(image, conf=confidence_threshold, imgsz=1024, iou=0.6)
+    image = Image.open(file).convert("RGB")
+    image = ImageOps.exif_transpose(image)
+    results = model.predict(image, conf=confidence_threshold, imgsz=1024, iou=0.6)
 
-     matched_boxes = []
-     for box in results[0].boxes:
-          class_name = model.names[int(box.cls)]
-          if class_name in accepted_classes:
-               matched_boxes.append(box)
+    matched_boxes = []
+    for box in results[0].boxes:
+        class_name = model.names[int(box.cls)]
+        if class_name in accepted_classes:
+            matched_boxes.append(box)
 
-     count = len(matched_boxes)
-     plotted_image = results[0].plot(labels=False)
-     return image, plotted_image, count
+    count = len(matched_boxes)
+    plotted_image = results[0].plot(labels=False)
+    return image, plotted_image, count
 
 
-# mode: single photo analysis
-
+# ==========================================
+# 1. MODE: SINGLE PHOTO ANALYSIS
+# ==========================================
 if analysis_mode == "Tek Fotoğraf Analizi (Hızlı)":
     st.markdown("##### Fotoğraf Yükle")
     uploaded_files = st.file_uploader("Fotoğrafları Seçin", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
     if uploaded_files:
-          total_count = 0
-          analysis_results = []
-          existing_archive = load_archive_data()
+        total_count = 0
+        analysis_results = []
+        existing_archive = load_archive_data()
 
-          with st.spinner("Fotoğraflar analiz ediliyor..."):
-               for file in uploaded_files:
-                    clean_image, plotted_image, count = process_image(file)
-                    total_count += count 
-                    calculated_kg = round((count * average_gram) / 1000, 2)
+        with st.spinner("Fotoğraflar analiz ediliyor..."):
+            for file in uploaded_files:
+                clean_image, plotted_image, count = process_image(file)
+                total_count += count 
+                calculated_kg = round((count * average_gram) / 1000, 2)
 
-                    clean_image.save(os.path.join(MEMORY_FOLDER, file.name))
-                    existing_archive[file.name] = {
-                         "tur": selected_label.split(" ")[0],
-                         "adet": count,
-                         "kg": calculated_kg
-                    }
+                clean_image.save(os.path.join(MEMORY_FOLDER, file.name))
+                existing_archive[file.name] = {
+                    "tur": selected_label.split(" ")[0],
+                    "adet": count,
+                    "kg": calculated_kg
+                }
 
-                    analysis_results.append({
-                         "file_name": file.name,
-                         "count": count,
-                         "image": plotted_image
-                    })
+                analysis_results.append({
+                    "file_name": file.name,
+                    "count": count,
+                    "image": plotted_image
+                })
 
-                    save_archive_data(existing_archive)
-                    total_kg = round((total_count * average_gram / 1000, 2))
+        save_archive_data(existing_archive)
+        total_kg = round((total_count * average_gram) / 1000, 2)
 
-                    st.markdown("---")
-                    st.markdown("##### Anlık Analiz Raporu")
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("Fotoğraf Sayısı", f"{len(uploaded_files)} Adet")
-                    m2.metric("Sayılan Toplam Meyve", f"{total_count} Adet")
-                    m3.metric("Tahmini Hasat", f"{total_kg} kg")
+        st.markdown("---")
+        st.markdown("##### Anlık Analiz Raporu")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Fotoğraf Sayısı", f"{len(uploaded_files)} Adet")
+        m2.metric("Sayılan Toplam Meyve", f"{total_count} Adet")
+        m3.metric("Tahmini Hasat", f"{total_kg} kg")
 
-                    st.markdown("---")
-                    st.markdown("##### Tespit Edilen Alanlar")
-                    column_count = max(1, min(len(analysis_results), 2))
-                    columns = st.columns(column_count)
-                    for i, result in enumerate(analysis_results): 
-                         with columns[i % column_count]:
-                            st.markdown(f"**Görsel:** '{result['file_name']}'")
-                            st.caption(f"Sayılan: **{result['count']} adet**")
-                            st.image(result["image"], channels="BGR", use_container_width=True)
+        st.markdown("---")
+        st.markdown("##### Tespit Edilen Alanlar")
+        column_count = max(1, min(len(analysis_results), 2))
+        columns = st.columns(column_count)
+        for i, result in enumerate(analysis_results): 
+            with columns[i % column_count]:
+                st.markdown(f"**Görsel:** `{result['file_name']}`")
+                st.caption(f"Sayılan: **{result['count']} adet**")
+                st.image(result["image"], channels="BGR", use_container_width=True)
+                st.write("")
 
-                            st.write("")
-                            st.info("** Bilgilendirme:** Bu sonuçlar yapay zeka destekli bir tahmin modeline dayanmaktadır. Işık yansımaları ve yaprak örtüsü gibi koşullardan dolayı küçük hata payları olabilir.")
+        st.info("💡 Bilgilendirme: Bu sonuçlar yapay zeka destekli bir tahmin modeline dayanmaktadır.")
 
-# mode: single tree 360° analysis
 
+# ==========================================
+# 2. MODE: SINGLE TREE 360° ANALYSIS
+# ==========================================
 elif analysis_mode == "Tek Ağaç 4 Cephe Analizi (360°)":
     st.markdown("##### Ağacın 4 Cephesinden Fotoğraflar Yükleyin")
     st.info("Ağacın etrafında 90° aralıklarla (Ön, Sağ, Arka, Sol) çekilmiş 4 fotoğraf yükleyin.")
@@ -198,8 +201,10 @@ elif analysis_mode == "Tek Ağaç 4 Cephe Analizi (360°)":
                     st.caption(f"Tespit Edilen: **{c_data['count']} Adet**")
                     st.image(c_data["image"], channels="BGR", use_container_width=True)
 
-# mode: field yield estimation (agritech)
 
+# ==========================================
+# 3. MODE: FIELD YIELD ESTIMATION (AGRITECH)
+# ==========================================
 else:
     st.markdown("##### Tarla Geneli Hasat Rekoltesi Tahmini")
     st.caption("Tarlayı temsil eden örnek ağaçların fotoğraflarını yükleyin, yapay zeka tüm bahçenin hasat miktarını çıkarsın.")
@@ -229,7 +234,6 @@ else:
                 t_back = st.file_uploader("3. Cephe (Arka)", type=["jpg", "jpeg", "png"], key=f"field_back_{i}")
                 t_left = st.file_uploader("4. Cephe (Sol)", type=["jpg", "jpeg", "png"], key=f"field_left_{i}")
 
-            # Yüklenen fotoğrafları bir liste haline getiriyoruz
             facades_t = [t_front, t_right, t_back, t_left]
             tree_files[i] = [f for f in facades_t if f is not None]
 
@@ -250,7 +254,6 @@ else:
                             _, _, count = process_image(file)
                             tree_total_count += count
                         
-                        # Eksik cephe varsa 4'e tamamlama oranı
                         if len(files) < 4:
                             tree_total_count = round((tree_total_count / len(files)) * 4)
                         
@@ -264,7 +267,6 @@ else:
             total_field_ton = round(total_field_kg / 1000, 2)
 
             st.success("Tarla Hasat Rekolte Analizi Başarıyla Tamamlandı!")
-            
             st.markdown("---")
             st.markdown("##### Tarla Hasat Tahmin Raporu")
             
@@ -281,8 +283,9 @@ else:
             b2.metric("Tahmini Toplam Tonaj", f"🏆 {total_field_ton} TON")
 
 
-# archive section
-
+# ==========================================
+# ARCHIVE SECTION
+# ==========================================
 st.markdown("---")
 st.markdown("##### Hasat Arşivi")
 
